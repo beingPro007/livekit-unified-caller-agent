@@ -223,7 +223,6 @@ async def outbound_entrypoint(ctx: JobContext):
             logger.warning("Call is ringing too long, breaking the loop")
             break
 
-        # Wait a bit before checking again
         await asyncio.sleep(0.1)
 
     # Agent session
