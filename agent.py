@@ -57,13 +57,7 @@ _default_instructions = (
         If asked about pricing, mention that services are customized based on business needs and suggest scheduling a consultation for a personalized quote.
         Be precise and direct in your responses. Avoid unnecessary explanations or filler content.
         
-        LEAD COLLECTION INSTRUCTIONS:
-        When the user shows clear interest in Gods of Growth's services or asks about working together, include the special operator "[[COLLECT_LEAD]]" at the very end of your response. This signals that it's time to collect the user's contact information. Signs of interest include:
-        - Asking about pricing or packages
-        - Inquiring about how to get started
-        - Mentioning their own business challenges that align with our services
-        - Asking for case studies or examples of our work
-        - Expressing a desire to improve their ecommerce performance
+
         Only include this operator when there's genuine interest, not just general questions about ecommerce.
         
     """
@@ -154,8 +148,8 @@ class OutboundCallerAgent(Agent):
         logger.info("Detected answering machine")
 
 
-async def entrypoint(ctx: JobContext):
-    logger.debug("entrypoint() called")
+async def outbound_entrypoint(ctx: JobContext):
+    logger.debug("outbound_entrypoint() called")
     data = await ctx.connect()
     logger.debug("Connected to room")
     logger.debug(f"Job metadata: {ctx.job.metadata}")
@@ -268,7 +262,7 @@ async def unified_entrypoint(ctx: JobContext):
 
     if "phone_number" in metadata_dict:
         logger.info("Detected outbound call (phone_number present)")
-        await entrypoint(ctx)  # Calls your outbound logic
+        await outbound_entrypoint(ctx)  # Calls your outbound logic
     else:
         logger.info("Detected inbound call (no phone_number)")
         await inbound_entrypoint(ctx)  # Calls your inbound logic
