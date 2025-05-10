@@ -211,9 +211,18 @@ async def entrypoint(ctx: JobContext):
     while True:
         status = participant.attributes.get("sip.callStatus")
         logger.debug(f"Call status: {status}")
+
+        # If the call is active, user has picked up
         if status == "active":
             logger.info("User has picked up")
             break
+
+        # If the call is rejected or terminated, stop the loop
+        if status in ["terminated", "rejected"]:
+            logger.info(f"Call was {status}, exiting the loop")
+            break
+
+        # Wait a bit before checking again
         await asyncio.sleep(0.1)
 
     # Agent session
