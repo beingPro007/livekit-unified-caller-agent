@@ -1,0 +1,9 @@
+{
+  "name": "Call dispatch",
+  "rule": {
+    "dispatchRuleIndividual": { "roomPrefix": "call" }
+  },
+  "roomConfig": {
+    "agents": [{ "agentName": "unified-caller" }]
+  }
+}
