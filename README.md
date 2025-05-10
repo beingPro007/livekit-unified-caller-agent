@@ -1,4 +1,4 @@
-# LiveKit Outbound Caller Voice Agent
+# LiveKit Unified Caller Voice Agent
 
 A basic example of a voice agent using LiveKit and Python. Has a few extras to get started:
 
@@ -6,15 +6,15 @@ A basic example of a voice agent using LiveKit and Python. Has a few extras to g
 
 Run the following commands to:
 - clone the repository
-- change directory to `livekit-outbound-caller-agent`
+- change directory to `livekit-unified-caller-agent`
 - create a virtual environment and activate it
 - install dependencies
 - download files
 
 ### Linux/macOS
 ```console
-git clone https://github.com/kylecampbell/livekit-outbound-caller-agent.git
-cd livekit-outbound-caller-agent
+git clone https://github.com/beingPro007/livekit-unified-caller-agent.git
+cd livekit-unified-caller-agent
 python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
