@@ -1,3 +1,5 @@
+# This project was inspired by [@kylecampbell](https://github.com/kylecampbell)
+
 # LiveKit Unified Caller Voice Agent
 
 A basic example of a voice agent using LiveKit and Python. Has a few extras to get started:
