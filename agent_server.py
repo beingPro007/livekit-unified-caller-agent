@@ -6,6 +6,7 @@ from pydantic import BaseModel
 import subprocess
 import json
 import uvicorn
+import os
 
 app = FastAPI()
 
@@ -39,6 +40,13 @@ async def start_call(req: CallRequest):
             "--agent-name", AGENT_NAME,
             "--metadata", metadata_json
         ]
+        
+        
+        env = os.environ.copy()
+        env["LIVEKIT_URL"] = "wss://duply-talk-r93j68n8.livekit.cloud"
+        env["api_key"] = "APIgj9v7rGTtPhk"
+        
+        result = subprocess.run(cmd, capture_output=True, text=True)
         result = subprocess.run(cmd, capture_output=True, text=True)
 
         if result.returncode != 0:
