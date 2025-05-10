@@ -2,8 +2,8 @@ import asyncio
 import logging
 import json
 import os
-from time import perf_counter
 from dotenv import load_dotenv
+import time
 
 from livekit import rtc, api
 from livekit.agents import (
@@ -207,7 +207,9 @@ async def entrypoint(ctx: JobContext):
         logger.error(f"Error waiting for SIP participant: {e}")
         raise
 
-    # Monitor call status (no auto shutdown)
+    # Monitor call status with a timeout and break early if still ringing after a period
+    start_time = time.time()
+    timeout = 30  # Timeout in seconds (you can adjust this value as needed)
     while True:
         status = participant.attributes.get("sip.callStatus")
         logger.debug(f"Call status: {status}")
@@ -220,6 +222,11 @@ async def entrypoint(ctx: JobContext):
         # If the call is rejected or terminated, stop the loop
         if status in ["terminated", "rejected"]:
             logger.info(f"Call was {status}, exiting the loop")
+            break
+
+        # If the call has been ringing for too long, break the loop
+        if status == "ringing" and (time.time() - start_time) > timeout:
+            logger.warning("Call is ringing too long, breaking the loop")
             break
 
         # Wait a bit before checking again
