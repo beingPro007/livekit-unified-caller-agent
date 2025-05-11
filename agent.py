@@ -187,7 +187,6 @@ async def outbound_entrypoint(ctx: JobContext):
 
     while True:
         status = participant.attributes.get("sip.callStatus")
-        logger.debug(f"Call status: {status}")
 
         if status == "active":
             session_should_start = True
