@@ -26,8 +26,17 @@ class CallRequest(BaseModel):
     phone_number: str
 
 
+import os
+import sys
+
 @app.post("/start_call")
 async def start_call(req: CallRequest):
+    if os.getenv("RUN_MAIN") and os.getenv("RUN_MAIN") != "true":
+        # Skip subprocess call in the extra reload process
+        return {"message": "Skipping due to reload process"}
+
+    print(f"Dispatch triggered with room: {req.room}, phone: {req.phone_number}")
+    
     metadata = {
         "phone_number": req.phone_number
     }
@@ -41,13 +50,11 @@ async def start_call(req: CallRequest):
             "--metadata", metadata_json
         ]
         
-        
         env = os.environ.copy()
         env["LIVEKIT_URL"] = "wss://duply-talk-r93j68n8.livekit.cloud"
         env["api_key"] = "APIgj9v7rGTtPhk"
         
-        result = subprocess.run(cmd, capture_output=True, text=True)
-        result = subprocess.run(cmd, capture_output=True, text=True)
+        result = subprocess.run(cmd, capture_output=True, text=True, env=env)
 
         if result.returncode != 0:
             raise Exception(result.stderr)

@@ -135,24 +135,19 @@ class OutboundCallerAgent(Agent):
 
 async def outbound_entrypoint(ctx: JobContext):
     logger.debug("outbound_entrypoint() called")
-    data = await ctx.connect()
+    await ctx.connect()
     logger.debug("Connected to room")
     logger.debug(f"Job metadata: {ctx.job.metadata}")
 
-    # Normalize metadata
     raw_meta = ctx.job.metadata or ""
-    if isinstance(raw_meta, str):
-        if not raw_meta.strip():
-            metadata = {}
-        else:
-            try:
-                metadata = json.loads(raw_meta)
-                logger.debug(f"Parsed metadata: {metadata}")
-            except json.JSONDecodeError as e:
-                logger.error(f"JSON decode error: {e}")
-                raise ValueError(f"Could not parse metadata JSON: {raw_meta!r}")
-    else:
-        metadata = raw_meta
+    metadata = {}
+    if isinstance(raw_meta, str) and raw_meta.strip():
+        try:
+            metadata = json.loads(raw_meta)
+            logger.debug(f"Parsed metadata: {metadata}")
+        except json.JSONDecodeError as e:
+            logger.error(f"JSON decode error: {e}")
+            raise ValueError(f"Could not parse metadata JSON: {raw_meta!r}")
 
     phone_number = metadata.get("phone_number")
     if not phone_number:
@@ -171,14 +166,12 @@ async def outbound_entrypoint(ctx: JobContext):
                 participant_identity=user_identity,
             )
         )
-
-        logger.info(f"SIP call initiated from +1XXXXXXXXXX to {phone_number}")
-        logger.debug("SIP participant created")
+        logger.info(f"SIP call initiated to {phone_number}")
     except Exception as e:
         logger.error(f"Failed to create SIP participant: {e}")
         raise
 
-    # Wait for SIP participant to join (no hangup or timeout anymore)
+    # Wait for SIP participant to join (with timeout + call status check)
     try:
         participant = await ctx.wait_for_participant(identity=user_identity)
         logger.debug(f"SIP participant joined: {participant.identity}")
@@ -186,31 +179,42 @@ async def outbound_entrypoint(ctx: JobContext):
         logger.error(f"Error waiting for SIP participant: {e}")
         raise
 
-    # Monitor call status with a timeout and break early if still ringing after a period
+    # Monitor call status
     start_time = time.time()
-    timeout = 30  # Timeout in seconds (you can adjust this value as needed)
+    timeout = 20  # seconds
+
+    session_should_start = False
+
     while True:
         status = participant.attributes.get("sip.callStatus")
         logger.debug(f"Call status: {status}")
 
-        # If the call is active, user has picked up
         if status == "active":
-            logger.info("User has picked up")
+            session_should_start = True
             break
 
-        # If the call is rejected or terminated, stop the loop
         if status in ["terminated", "rejected"]:
-            logger.info(f"Call was {status}, exiting the loop")
             break
 
-        # If the call has been ringing for too long, break the loop
         if status == "ringing" and (time.time() - start_time) > timeout:
-            logger.warning("Call is ringing too long, breaking the loop")
-            break
+            logger.warning("Call ringing too long, deleting room...")
+
+            try:
+                await ctx.api.room.delete_room(
+                    api.DeleteRoomRequest(room=ctx.room.name)
+                )
+                logger.info("Room deleted successfully")
+            except Exception as e:
+                logger.error(f"Failed to delete room: {e}")
+
+            return  # Exit early — do NOT start AgentSession
 
         await asyncio.sleep(0.1)
+    # Only start session if user picked up
+    if not session_should_start:
+        logger.info("User did not pick up, skipping AgentSession")
+        return
 
-    # Agent session
     session = AgentSession(
         userdata={
             "api": ctx.api,
@@ -233,7 +237,7 @@ async def outbound_entrypoint(ctx: JobContext):
 
     logger.debug("Session started, sending greeting...")
     await session.generate_reply(
-        instructions=f"Greet the user, introduce yourself as Phonio AI on behalf of Abhinav Baldha, and offer your assistance. Keep your response brief and clear."
+        instructions="Greet the user, introduce yourself as Phonio AI on behalf of Abhinav Baldha, and offer your assistance. Keep your response brief and clear."
     )
 
 async def unified_entrypoint(ctx: JobContext):
