@@ -73,9 +73,9 @@ async def inbound_entrypoint(ctx: JobContext):
             "room": ctx.room,
         },
         vad=silero.VAD.load(activation_threshold=0.6),
-        stt=deepgram.STT(model="nova-2-phonecall"),
+        stt=deepgram.STT(model='enhanced-phonecall'),
         llm=openai.LLM(model="gpt-4o-mini"),
-        tts=cartesia.TTS(),
+        tts=cartesia.TTS(model='sonic', speed='normal'),
         turn_detection=MultilingualModel(),
     )
 
