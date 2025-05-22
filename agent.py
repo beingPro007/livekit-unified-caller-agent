@@ -4,6 +4,9 @@ import json
 import os
 from dotenv import load_dotenv
 import time
+import uvicorn
+import threading
+from common_agent import common_agent_session, LangChainAgentWrapper
 
 from livekit import rtc, api
 from livekit.agents import (
@@ -17,7 +20,6 @@ from livekit.agents import (
     RoomInputOptions,
 )
 from livekit.plugins import deepgram, openai, silero, cartesia, noise_cancellation
-from livekit.plugins.turn_detector.multilingual import MultilingualModel
 
 logger = logging.getLogger("outbound-caller")
 logger.setLevel(logging.DEBUG)
@@ -34,11 +36,8 @@ print(f"[DEBUG] Loaded SIP_OUTBOUND_TRUNK_ID = {outbound_trunk_id!r}")
 if not outbound_trunk_id:
     raise RuntimeError("Missing SIP_OUTBOUND_TRUNK_ID from environment")
 
-print("Outbound Trunk ID",outbound_trunk_id)
-if not outbound_trunk_id or not outbound_trunk_id.startswith("ST_"):
-    raise ValueError("SIP_OUTBOUND_TRUNK_ID is not set or invalid")
+prewarmed_llm_wrapper = LangChainAgentWrapper()
 
-#This is the custom instruction which is being given to the AI agent on startup...
 _default_instructions = (
     """
     You are Alexis, a helpful and knowledgeable voice assistant from Gods of Growth.
@@ -70,24 +69,13 @@ async def inbound_entrypoint(ctx: JobContext):
         raise
 
     # Start the AgentSession as before
-    session = AgentSession(
-        userdata={
-            "api": ctx.api,
-            "participant": participant,
-            "room": ctx.room,
-        },
-        vad=silero.VAD.load(activation_threshold=0.6),
-        stt=deepgram.STT(model='enhanced-phonecall'),
-        llm=openai.LLM(model="gpt-4o-mini"),
-        tts=cartesia.TTS(model='sonic', speed='normal'),
-        turn_detection=MultilingualModel(),
-    )
-
+    session = common_agent_session(ctx, participant)
+    
     logger.debug("Starting AgentSession (inbound)...")
     await session.start(
         room=ctx.room,
         agent=OutboundCallerAgent(),
-        room_input_options=RoomInputOptions(noise_cancellation=noise_cancellation.BVC()),
+        room_input_options=RoomInputOptions(noise_cancellation=noise_cancellation.BVC(), text_enabled=True),
     )
 
     logger.debug("Session started, sending greeting (inbound)...")
@@ -95,7 +83,6 @@ async def inbound_entrypoint(ctx: JobContext):
         instructions="Hi there! This is Alexis calling from Gods of Growth. How can I help your ecommerce business today?"
     )
 
-#Class for outbound Call agent
 class OutboundCallerAgent(Agent):
     def __init__(self) -> None:
         super().__init__(instructions=_default_instructions)
@@ -214,30 +201,30 @@ async def outbound_entrypoint(ctx: JobContext):
         logger.info("User did not pick up, skipping AgentSession")
         return
 
-    session = AgentSession(
-        userdata={
-            "api": ctx.api,
-            "participant": participant,
-            "room": ctx.room,
-        },
-        vad=silero.VAD.load(activation_threshold=0.6),
-        stt=deepgram.STT(model="nova-2-phonecall"),
-        llm=openai.LLM(model="gpt-4o-mini"),
-        tts=cartesia.TTS(),
-        turn_detection=MultilingualModel(),
-    )
+    session = common_agent_session(ctx, participant, prewarmed_llm_wrapper.llm.invoke)
 
     logger.debug("Starting AgentSession...")
-    await session.start(
-        room=ctx.room,
-        agent=OutboundCallerAgent(),
-        room_input_options=RoomInputOptions(noise_cancellation=noise_cancellation.BVC()),
-    )
 
-    logger.debug("Session started, sending greeting...")
-    await session.generate_reply(
-        instructions="Hi! I'm Alexis from Gods of Growth. How can I assist you with growing your ecommerce brand today?"
-    )
+    try:
+        await session.start(
+            room=ctx.room,
+            agent=OutboundCallerAgent(),
+            room_input_options=RoomInputOptions(noise_cancellation=noise_cancellation.BVC()),
+        )
+
+        logger.debug("Session started successfully (outbound)")
+
+        await session.say("Hi, this is a test message from Alexis.")
+        await asyncio.sleep(1)
+        try:
+            reply = await session.generate_reply(instructions="Hi! I'm Alexis from Gods of Growth...")
+            logger.debug(f"LLM reply: {reply}")
+        except Exception as e:
+            logger.error(f"Error in generating the reply {e}")
+
+
+    except Exception as e:
+        logger.error(f"Error in starting the AgentSession: {e}")
 
 async def unified_entrypoint(ctx: JobContext):
     logger.debug("unified_entrypoint() called")
@@ -255,6 +242,7 @@ async def unified_entrypoint(ctx: JobContext):
         await inbound_entrypoint(ctx)  # Calls your inbound logic
 
 if __name__ == "__main__":
+    
     cli.run_app(
         WorkerOptions(
             entrypoint_fnc=unified_entrypoint,

@@ -121,7 +121,7 @@
         const payload = { room, phone_number: phone };
 
         try {
-          const res = await fetch('http://37.27.241.172:8000/start_call', {
+          const res = await fetch('http://localhost:8000/start_call', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload),
